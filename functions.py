@@ -5,43 +5,65 @@ from youtube_transcript_api import YouTubeTranscriptApi
 from sentence_transformers import SentenceTransformer
 import os
 
-def getVideoRecords(response):
+def getVideoRecords(response: requests.models.Response) -> list:
+    """
+        Function to extract YouTube video data from GET request response
+
+        Dependers: 
+            - getVideoIDs()
+    """
 
     video_record_list = []
-
+    
     for raw_item in json.loads(response.text)['items']:
-        if raw_item['id']['kind'] != 'youtube#video':
+    
+        # only execute for youtube videos
+        if raw_item['id']['kind'] != "youtube#video":
             continue
-
+        
         video_record = {}
         video_record['video_id'] = raw_item['id']['videoId']
         video_record['datetime'] = raw_item['snippet']['publishedAt']
         video_record['title'] = raw_item['snippet']['title']
-
+        
         video_record_list.append(video_record)
 
     return video_record_list
 
+
 def getVideoIDs():
-    channel_id = 'UCa9gErQ9AE5jT2DZLjXBIdA'
-    page_token = None
-    url = 'https://www.googleapis.com/youtube/v3/search'
+    """
+        Function to return all video IDs for Shaw Talebi's YouTube channel
+
+        Dependencies: 
+            - getVideoRecords()
+    """
+
+
+    channel_id = 'UCa9gErQ9AE5jT2DZLjXBIdA' # my YouTube channel ID
+    page_token = None # initialize page token
+    url = 'https://www.googleapis.com/youtube/v3/search' # YouTube search API endpoint
     my_key = os.getenv('YT_API_KEY')
 
+    # extract video data across multiple search result pages
     video_record_list = []
 
-    while page_token !=0:
-        params = {"key":my_key, "channelID": channel_id, "part":["snippet", "id"], "order":"date", "maxResults":50, "pageToken": page_token}
+    while page_token != 0:
+        params = {"key": my_key, 'channelId': channel_id, 'part': ["snippet","id"], 'order': "date", 'maxResults':50, 'pageToken': page_token}
         response = requests.get(url, params=params)
 
+        # append video records to list
         video_record_list += getVideoRecords(response)
 
         try:
+            # grab next page token
             page_token = json.loads(response.text)['nextPageToken']
         except:
+            # if no next page token kill while loop
             page_token = 0
-    
-    pl.DataFrame(video_record_list).write_parquet("data/video-ids.parquet")
+
+    # write videos ids as parquet file
+    pl.DataFrame(video_record_list).write_parquet('data/video-ids.parquet')
 
 
 def extractTranscriptText(transcript: list) -> str:
